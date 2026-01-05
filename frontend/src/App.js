@@ -14,10 +14,13 @@ import {
   Typography,
   Box,
   TextField,
+  FormControl,
+  InputLabel,
   Select,
   MenuItem,
-  FormControl,
-  InputLabel
+  Paper,
+  BottomNavigation,
+  BottomNavigationAction
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -25,20 +28,44 @@ import {
   Mic as MicIcon,
   VideoCall as VideoCallIcon,
   Call as CallIcon,
-  EmojiEmotions as EmojiEmotionsIcon
+  EmojiEmotions as EmojiEmotionsIcon,
+  Home as HomeIcon,
+  Explore as ExploreIcon,
+  AccountCircle as AccountIcon
 } from '@mui/icons-material';
 
 const socket = io('http://localhost:5000');
 
+const defaultAvatars = [
+  'https://media.gettyimages.com/id/1307064735/vector/people-avatar-round-icon-set-profile-diverse-empty-faces-for-social-network-vector-abstract.jpg?s=612x612&w=gi&k=20&c=Tu6-13XMKm6SwLisKdNr3iNsAX2Tc7aQZ4sXVYRz4BQ=',
+  'https://media.gettyimages.com/id/1227566111/vector/people-avatar-icon-set-profile-diverse-faces-for-social-network-vector-abstract-illustration.jpg?s=612x612&w=gi&k=20&c=r3mrnWICWrCH8y_LUNSV_uHxg5vf6tuBeo1Olv4qLMs=',
+  'https://media.gettyimages.com/id/1570061111/vector/people-avatar-square-icon-set-profile-diverse-faces-for-social-network-and-applications.jpg?s=612x612&w=gi&k=20&c=9pBfr-qtvOco8SRV9DN1xjbcJCLjjtDaI4RMxWVUG6g=',
+  'https://img.freepik.com/free-vector/diverse-people-avatars-man-woman-characters-faces-social-media-profile-vector-flat-illustration-portraits-male-female-person-with-different-hairstyle-square-frame_107791-11841.jpg',
+  'https://static.vecteezy.com/system/resources/thumbnails/051/959/812/small/a-collection-of-colorful-avatar-icons-representing-diverse-people-ideal-for-social-media-profiles-user-interfaces-and-online-communities-png.png',
+  'https://media.gettyimages.com/id/1570061094/vector/people-avatar-round-icon-set-profile-diverse-empty-faces-for-social-network-and-applications.jpg?s=612x612&w=gi&k=20&c=uNnYl2Fn6W2y20dsBpE-0iMB0NvJKXMx9bFlK0keonM='
+];
+
 function App() {
+  const [navValue, setNavValue] = useState(0);
+
   return (
     <Router>
-      <Switch>
-        <Route path="/" exact component={Home} />
-        <Route path="/explore" component={Explorer} />
-        <Route path="/chat/:userId" component={Chat} />
-        <Route path="/account" component={Account} />
-      </Switch>
+      <Box sx={{ pb: 8 }}>
+        <Switch>
+          <Route path="/" exact component={Home} />
+          <Route path="/explore" component={Explorer} />
+          <Route path="/chat/:userId" component={Chat} />
+          <Route path="/account" component={Account} />
+        </Switch>
+      </Box>
+
+      <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0 }} elevation={3}>
+        <BottomNavigation value={navValue} onChange={(e, newValue) => setNavValue(newValue)}>
+          <BottomNavigationAction label="Home" icon={<HomeIcon />} component="a" href="/" />
+          <BottomNavigationAction label="Explore" icon={<ExploreIcon />} component="a" href="/explore" />
+          <BottomNavigationAction label="Account" icon={<AccountIcon />} component="a" href="/account" />
+        </BottomNavigation>
+      </Paper>
     </Router>
   );
 }
@@ -47,9 +74,7 @@ function App() {
 function Home() {
   const [users, setUsers] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [welcome] = useState('Welcome!');
 
-  // Form states
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -59,46 +84,41 @@ function Home() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      // Fixed: Full URL here
       axios.get('http://localhost:5000/users', { headers: { 'x-auth-token': token } })
         .then(res => {
           setUsers(res.data);
           setIsLoggedIn(true);
+          const userId = JSON.parse(atob(token.split('.')[1]))._id;
+          socket.emit('join', userId);
         })
-        .catch(err => {
-          console.error('Token invalid or server error', err);
-          localStorage.removeItem('token');
-          setIsLoggedIn(false);
-        });
+        .catch(() => localStorage.removeItem('token'));
+
+      socket.on('user-status', ({ userId, isActive }) => {
+        setUsers(prev => prev.map(u => u._id === userId ? { ...u, isActive } : u));
+      });
+
+      return () => socket.off('user-status');
     }
-
-    socket.on('user-status', ({ userId, isActive }) => {
-      setUsers(prev => prev.map(u => u._id === userId ? { ...u, isActive } : u));
-    });
-
-    return () => socket.off('user-status');
   }, []);
 
   const sendFriendRequest = (toId) => {
     const token = localStorage.getItem('token');
     axios.post('http://localhost:5000/friend-request', { toId }, { headers: { 'x-auth-token': token } })
       .then(() => alert('Friend request sent!'))
-      .catch(err => alert('Error sending request'));
+      .catch(() => alert('Error'));
   };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 700, mx: 'auto' }}>
-      <Typography variant="h3" gutterBottom align="center" color="primary">
-        {welcome}
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h4" align="center" gutterBottom color="primary">
+        Welcome!
       </Typography>
 
       {!isLoggedIn ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, mt: 4 }}>
+        <Box sx={{ maxWidth: 600, mx: 'auto', p: 2 }}>
           {/* Register Form */}
-          <Box sx={{ p: 4, border: '1px solid #ddd', borderRadius: 3, bgcolor: '#f9f9f9' }}>
-            <Typography variant="h5" gutterBottom>
-              Register New Account
-            </Typography>
+          <Box sx={{ p: 4, border: '1px solid #ddd', borderRadius: 3, bgcolor: '#f9f9f9', mb: 4 }}>
+            <Typography variant="h5" gutterBottom>Register New Account</Typography>
             <TextField label="Name" fullWidth margin="normal" value={name} onChange={e => setName(e.target.value)} />
             <TextField label="Email" type="email" fullWidth margin="normal" value={email} onChange={e => setEmail(e.target.value)} />
             <TextField label="Password" type="password" fullWidth margin="normal" value={pass} onChange={e => setPass(e.target.value)} />
@@ -109,20 +129,15 @@ function Home() {
               fullWidth
               sx={{ mt: 3 }}
               onClick={async () => {
-                if (!name || !email || !pass) {
-                  alert('Please fill all fields');
-                  return;
-                }
+                if (!name || !email || !pass) return alert('Fill all fields');
                 try {
                   const res = await axios.post('http://localhost:5000/register', { name, email, password: pass });
                   localStorage.setItem('token', res.data.token);
                   setIsLoggedIn(true);
-                  alert('🎉 Success! You are now logged in as ' + name);
-                  // Clear form
+                  alert('Success! Logged in as ' + name);
                   setName(''); setEmail(''); setPass('');
                 } catch (err) {
-                  console.error(err);
-                  alert('Registration failed. Check console (F12) or try different email.');
+                  alert('Failed. Try different email.');
                 }
               }}
             >
@@ -132,9 +147,7 @@ function Home() {
 
           {/* Login Form */}
           <Box sx={{ p: 4, border: '1px solid #ddd', borderRadius: 3, bgcolor: '#e3f2fd' }}>
-            <Typography variant="h5" gutterBottom>
-              Login to Existing Account
-            </Typography>
+            <Typography variant="h5" gutterBottom>Login</Typography>
             <TextField label="Email" type="email" fullWidth margin="normal" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
             <TextField label="Password" type="password" fullWidth margin="normal" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
             <Button
@@ -148,10 +161,10 @@ function Home() {
                   const res = await axios.post('http://localhost:5000/login', { email: loginEmail, password: loginPass });
                   localStorage.setItem('token', res.data.token);
                   setIsLoggedIn(true);
-                  alert('✅ Logged in successfully!');
+                  alert('Logged in!');
                   setLoginEmail(''); setLoginPass('');
                 } catch (err) {
-                  alert('Login failed: Wrong email or password');
+                  alert('Wrong email/password');
                 }
               }}
             >
@@ -159,47 +172,42 @@ function Home() {
             </Button>
           </Box>
 
-          <Box sx={{ textAlign: 'center' }}>
+          <Box sx={{ textAlign: 'center', mt: 4 }}>
             <Button variant="text" size="large" onClick={() => window.location.href = '/explore'}>
-              Continue as Guest → Explorer Page
+              Continue as Guest → Explorer
             </Button>
           </Box>
         </Box>
       ) : (
         <>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
-            <Typography variant="h4">Hello! You're logged in 👋</Typography>
-            <Button variant="outlined" href="/account">My Account</Button>
-          </Box>
-
-          <Typography variant="h5" gutterBottom>
-            Active Users ({users.length} total, {users.filter(u => u.isActive).length} online)
+          <Typography variant="h5" align="center" gutterBottom>
+            Active Users ({users.filter(u => u.isActive).length} online)
           </Typography>
 
           <List>
             {users.map(user => (
               <ListItem
                 key={user._id}
+                button
+                onClick={() => window.location.href = `/chat/${user._id}`}
                 secondaryAction={
-                  <Button variant="contained" size="small" onClick={() => sendFriendRequest(user._id)}>
+                  <Button variant="contained" size="small" onClick={(e) => {
+                    e.stopPropagation();
+                    sendFriendRequest(user._id);
+                  }}>
                     Add Friend
                   </Button>
                 }
+                sx={{ borderRadius: 2, mb: 1, bgcolor: 'background.paper' }}
               >
                 <ListItemAvatar>
-                  <Avatar />
+                  <Avatar
+                    src={user.photo || defaultAvatars[Math.floor(Math.random() * defaultAvatars.length)]}
+                    sx={{ width: 60, height: 60 }}
+                  />
                 </ListItemAvatar>
                 <ListItemText primary={user.name} secondary={user.email} />
-                <Box
-                  sx={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    bgcolor: user.isActive ? 'success.main' : 'warning.main',
-                    ml: 2,
-                    boxShadow: 3
-                  }}
-                />
+                <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: user.isActive ? 'success.main' : 'warning.main' }} />
               </ListItem>
             ))}
           </List>
@@ -208,7 +216,8 @@ function Home() {
     </Box>
   );
 }
-// Explorer Page
+
+// Explorer Page (from your original code)
 function Explorer() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState({ google: [], youtube: [] });
@@ -263,11 +272,18 @@ function Explorer() {
           </Box>
         ))}
       </Box>
+
+      <Typography variant="h5" gutterBottom sx={{ mt: 6 }}>People Photos</Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 2 }}>
+        {defaultAvatars.map((url, i) => (
+          <img key={i} src={url} alt="person" style={{ width: '100%', borderRadius: 12, boxShadow: '0 4px 8px rgba(0,0,0,0.2)' }} />
+        ))}
+      </Box>
     </Box>
   );
 }
 
-// Chat Page
+// Chat Page (from your original code)
 function Chat({ match }) {
   const userId = match.params.userId;
   const [messages, setMessages] = useState([]);
@@ -351,7 +367,7 @@ function Chat({ match }) {
   );
 }
 
-// Account Page
+// Account Page (from your original code)
 function Account() {
   const requestDelete = () => {
     const token = localStorage.getItem('token');
