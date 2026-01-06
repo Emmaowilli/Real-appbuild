@@ -10,35 +10,24 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  IconButton,
   Typography,
   Box,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Paper,
-  BottomNavigation,
-  BottomNavigationAction
+  AppBar,
+  Toolbar
 } from '@mui/material';
 import {
-  Send as SendIcon,
-  CameraAlt as CameraAltIcon,
-  Mic as MicIcon,
-  VideoCall as VideoCallIcon,
-  Call as CallIcon,
-  EmojiEmotions as EmojiEmotionsIcon,
   Home as HomeIcon,
   Explore as ExploreIcon,
-  AccountCircle as AccountIcon
+  AccountCircle as AccountIcon,
+  Chat as ChatIcon
 } from '@mui/icons-material';
 
 const socket = io('http://localhost:5000');
 
 const defaultAvatars = [
   'https://media.gettyimages.com/id/1307064735/vector/people-avatar-round-icon-set-profile-diverse-empty-faces-for-social-network-vector-abstract.jpg?s=612x612&w=gi&k=20&c=Tu6-13XMKm6SwLisKdNr3iNsAX2Tc7aQZ4sXVYRz4BQ=',
-  'https://media.gettyimages.com/id/1227566111/vector/people-avatar-icon-set-profile-diverse-faces-for-social-network-vector-abstract-illustration.jpg?s=612x612&w=gi&k=20&c=r3mrnWICWrCH8y_LUNSV_uHxg5vf6tuBeo1Olv4qLMs=',
+  'https://media.gettyimages.com/id/1227566111/vector/people-avatar-icon-set-profile-diverse Di-faces-for-social-network-vector-abstract-illustration.jpg?s=612x612&w=gi&k=20&c=r3mrnWICWrCH8y_LUNSV_uHxg5vf6tuBeo1Olv4qLMs=',
   'https://media.gettyimages.com/id/1570061111/vector/people-avatar-square-icon-set-profile-diverse-faces-for-social-network-and-applications.jpg?s=612x612&w=gi&k=20&c=9pBfr-qtvOco8SRV9DN1xjbcJCLjjtDaI4RMxWVUG6g=',
   'https://img.freepik.com/free-vector/diverse-people-avatars-man-woman-characters-faces-social-media-profile-vector-flat-illustration-portraits-male-female-person-with-different-hairstyle-square-frame_107791-11841.jpg',
   'https://static.vecteezy.com/system/resources/thumbnails/051/959/812/small/a-collection-of-colorful-avatar-icons-representing-diverse-people-ideal-for-social-media-profiles-user-interfaces-and-online-communities-png.png',
@@ -46,11 +35,36 @@ const defaultAvatars = [
 ];
 
 function App() {
-  const [navValue, setNavValue] = useState(0);
-
   return (
     <Router>
-      <Box sx={{ pb: 8 }}>
+      <Box>
+        {/* Gradient Top Bar with centered buttons and Account on right */}
+        <AppBar position="static" sx={{
+          background: 'linear-gradient(90deg, #8B5CF6 0%, #6366F1 50%, #06B6D4 100%)',
+          boxShadow: '0 8px 32px rgba(139, 92, 246, 0.5)'
+        }}>
+          <Toolbar sx={{ justifyContent: 'center', position: 'relative' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', position: 'absolute', left: 16 }}>
+              Social App
+            </Typography>
+
+            <Box sx={{ display: 'flex', gap: 4 }}>
+              <Button color="inherit" startIcon={<HomeIcon />} href="/">Home</Button>
+              <Button color="inherit" startIcon={<ChatIcon />} href="/">Chat</Button>
+              <Button color="inherit" startIcon={<ExploreIcon />} href="/explore">Explore</Button>
+            </Box>
+
+            <Button 
+              color="inherit" 
+              startIcon={<AccountIcon />} 
+              href="/account"
+              sx={{ position: 'absolute', right: 16 }}
+            >
+              Account
+            </Button>
+          </Toolbar>
+        </AppBar>
+
         <Switch>
           <Route path="/" exact component={Home} />
           <Route path="/explore" component={Explorer} />
@@ -58,22 +72,15 @@ function App() {
           <Route path="/account" component={Account} />
         </Switch>
       </Box>
-
-      <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0 }} elevation={3}>
-        <BottomNavigation value={navValue} onChange={(e, newValue) => setNavValue(newValue)}>
-          <BottomNavigationAction label="Home" icon={<HomeIcon />} component="a" href="/" />
-          <BottomNavigationAction label="Explore" icon={<ExploreIcon />} component="a" href="/explore" />
-          <BottomNavigationAction label="Account" icon={<AccountIcon />} component="a" href="/account" />
-        </BottomNavigation>
-      </Paper>
     </Router>
   );
 }
 
-// Home Page
+// Home Page - your existing code
 function Home() {
   const [users, setUsers] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showForm, setShowForm] = useState('');
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -88,10 +95,14 @@ function Home() {
         .then(res => {
           setUsers(res.data);
           setIsLoggedIn(true);
+          setShowForm('');
           const userId = JSON.parse(atob(token.split('.')[1]))._id;
           socket.emit('join', userId);
         })
-        .catch(() => localStorage.removeItem('token'));
+        .catch(() => {
+          localStorage.removeItem('token');
+          setIsLoggedIn(false);
+        });
 
       socket.on('user-status', ({ userId, isActive }) => {
         setUsers(prev => prev.map(u => u._id === userId ? { ...u, isActive } : u));
@@ -109,74 +120,83 @@ function Home() {
   };
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: 3 }}>
       <Typography variant="h4" align="center" gutterBottom color="primary">
         Welcome!
       </Typography>
 
       {!isLoggedIn ? (
-        <Box sx={{ maxWidth: 600, mx: 'auto', p: 2 }}>
-          {/* Register Form */}
-          <Box sx={{ p: 4, border: '1px solid #ddd', borderRadius: 3, bgcolor: '#f9f9f9', mb: 4 }}>
-            <Typography variant="h5" gutterBottom>Register New Account</Typography>
-            <TextField label="Name" fullWidth margin="normal" value={name} onChange={e => setName(e.target.value)} />
-            <TextField label="Email" type="email" fullWidth margin="normal" value={email} onChange={e => setEmail(e.target.value)} />
-            <TextField label="Password" type="password" fullWidth margin="normal" value={pass} onChange={e => setPass(e.target.value)} />
-            <Button
-              variant="contained"
-              color="primary"
-              size="large"
-              fullWidth
-              sx={{ mt: 3 }}
-              onClick={async () => {
-                if (!name || !email || !pass) return alert('Fill all fields');
-                try {
-                  const res = await axios.post('http://localhost:5000/register', { name, email, password: pass });
-                  localStorage.setItem('token', res.data.token);
-                  setIsLoggedIn(true);
-                  alert('Success! Logged in as ' + name);
-                  setName(''); setEmail(''); setPass('');
-                } catch (err) {
-                  alert('Failed. Try different email.');
-                }
-              }}
-            >
-              Register
-            </Button>
-          </Box>
+        <Box sx={{ maxWidth: 600, mx: 'auto', mt: 6 }}>
+          {showForm === '' && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <Button variant="contained" size="large" onClick={() => setShowForm('register')}>
+                Register
+              </Button>
+              <Button variant="outlined" size="large" onClick={() => setShowForm('login')}>
+                Login
+              </Button>
+              <Button variant="text" onClick={() => window.location.href = '/explore'}>
+                Continue as Guest → Explorer
+              </Button>
+            </Box>
+          )}
 
-          {/* Login Form */}
-          <Box sx={{ p: 4, border: '1px solid #ddd', borderRadius: 3, bgcolor: '#e3f2fd' }}>
-            <Typography variant="h5" gutterBottom>Login</Typography>
-            <TextField label="Email" type="email" fullWidth margin="normal" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
-            <TextField label="Password" type="password" fullWidth margin="normal" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
-            <Button
-              variant="contained"
-              color="success"
-              size="large"
-              fullWidth
-              sx={{ mt: 3 }}
-              onClick={async () => {
-                try {
-                  const res = await axios.post('http://localhost:5000/login', { email: loginEmail, password: loginPass });
-                  localStorage.setItem('token', res.data.token);
-                  setIsLoggedIn(true);
-                  alert('Logged in!');
-                  setLoginEmail(''); setLoginPass('');
-                } catch (err) {
-                  alert('Wrong email/password');
-                }
-              }}
-            >
-              Login
-            </Button>
-          </Box>
+          {showForm === 'register' && (
+            <Box sx={{ p: 4, borderRadius: 3, bgcolor: '#f9f9f9', boxShadow: 3 }}>
+              <Typography variant="h5" gutterBottom>Register</Typography>
+              <TextField label="Name" fullWidth margin="normal" value={name} onChange={e => setName(e.target.value)} />
+              <TextField label="Email" type="email" fullWidth margin="normal" value={email} onChange={e => setEmail(e.target.value)} />
+              <TextField label="Password" type="password" fullWidth margin="normal" value={pass} onChange={e => setPass(e.target.value)} />
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ mt: 3 }}
+                onClick={async () => {
+                  if (!name || !email || !pass) return alert('Fill all fields');
+                  try {
+                    const res = await axios.post('http://localhost:5000/register', { name, email, password: pass });
+                    localStorage.setItem('token', res.data.token);
+                    setIsLoggedIn(true);
+                    setShowForm('');
+                    alert('Success! Logged in as ' + name);
+                  } catch (err) {
+                    alert('Failed. Try different email.');
+                  }
+                }}
+              >
+                Register
+              </Button>
+              <Button onClick={() => setShowForm('')} sx={{ mt: 2 }}>Back</Button>
+            </Box>
+          )}
 
-          <Box sx={{ textAlign: 'center', mt: 4 }}>
-            <Button variant="text" size="large" onClick={() => window.location.href = '/explore'}>
-              Continue as Guest → Explorer
-            </Button>
-          </Box>
+          {showForm === 'login' && (
+            <Box sx={{ p: 4, borderRadius: 3, bgcolor: '#e3f2fd', boxShadow: 3 }}>
+              <Typography variant="h5" gutterBottom>Login</Typography>
+              <TextField label="Email" type="email" fullWidth margin="normal" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
+              <TextField label="Password" type="password" fullWidth margin="normal" value={loginPass} onChange={e => setLoginPass(e.target.value)} />
+              <Button
+                variant="contained"
+                color="success"
+                fullWidth
+                sx={{ mt: 3 }}
+                onClick={async () => {
+                  try {
+                    const res = await axios.post('http://localhost:5000/login', { email: loginEmail, password: loginPass });
+                    localStorage.setItem('token', res.data.token);
+                    setIsLoggedIn(true);
+                    setShowForm('');
+                    alert('Logged in!');
+                  } catch (err) {
+                    alert('Wrong email/password');
+                  }
+                }}
+              >
+                Login
+              </Button>
+              <Button onClick={() => setShowForm('')} sx={{ mt: 2 }}>Back</Button>
+            </Box>
+          )}
         </Box>
       ) : (
         <>
@@ -198,16 +218,16 @@ function Home() {
                     Add Friend
                   </Button>
                 }
-                sx={{ borderRadius: 2, mb: 1, bgcolor: 'background.paper' }}
+                sx={{ borderRadius: 3, mb: 2, bgcolor: 'background.paper', boxShadow: 4 }}
               >
                 <ListItemAvatar>
                   <Avatar
                     src={user.photo || defaultAvatars[Math.floor(Math.random() * defaultAvatars.length)]}
-                    sx={{ width: 60, height: 60 }}
+                    sx={{ width: 70, height: 70 }}
                   />
                 </ListItemAvatar>
-                <ListItemText primary={user.name} secondary={user.email} />
-                <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: user.isActive ? 'success.main' : 'warning.main' }} />
+                <ListItemText primary={<Typography variant="h6">{user.name}</Typography>} secondary={user.email} />
+                <Box sx={{ width: 24, height: 24, borderRadius: '50%', bgcolor: user.isActive ? 'success.main' : 'warning.main', boxShadow: 3 }} />
               </ListItem>
             ))}
           </List>
@@ -217,7 +237,7 @@ function Home() {
   );
 }
 
-// Explorer Page (from your original code)
+// Explorer Page
 function Explorer() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState({ google: [], youtube: [] });
@@ -245,33 +265,35 @@ function Explorer() {
       </Box>
 
       <Typography variant="h5" gutterBottom>Google Results</Typography>
-      {results.google.map((item, i) => (
+      {results.google.length > 0 ? results.google.map((item, i) => (
         <Box key={i} sx={{ mb: 2 }}>
           <Typography variant="subtitle1">{item.title}</Typography>
           <a href={item.link} target="_blank" rel="noopener noreferrer">
             {item.link}
           </a>
         </Box>
-      ))}
+      )) : <Typography color="text.secondary">No Google results</Typography>}
 
       <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>YouTube Videos</Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 3 }}>
-        {results.youtube.map((item, i) => (
-          <Box key={i}>
-            <Typography variant="subtitle1" gutterBottom>
-              {item.snippet.title}
-            </Typography>
-            <iframe
-              width="100%"
-              height="200"
-              src={`https://www.youtube.com/embed/${item.id.videoId}`}
-              title={item.snippet.title}
-              frameBorder="0"
-              allowFullScreen
-            />
-          </Box>
-        ))}
-      </Box>
+      {results.youtube.length > 0 ? (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 3 }}>
+          {results.youtube.map((item, i) => (
+            <Box key={i}>
+              <Typography variant="subtitle1" gutterBottom>
+                {item.snippet.title}
+              </Typography>
+              <iframe
+                width="100%"
+                height="200"
+                src={`https://www.youtube.com/embed/${item.id.videoId}`}
+                title={item.snippet.title}
+                frameBorder="0"
+                allowFullScreen
+              />
+            </Box>
+          ))}
+        </Box>
+      ) : <Typography color="text.secondary">No YouTube videos</Typography>}
 
       <Typography variant="h5" gutterBottom sx={{ mt: 6 }}>People Photos</Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 2 }}>
@@ -283,12 +305,11 @@ function Explorer() {
   );
 }
 
-// Chat Page (from your original code)
+// Chat Page - dark purple theme
 function Chat({ match }) {
   const userId = match.params.userId;
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
-  const [theme, setTheme] = useState('light');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -319,16 +340,9 @@ function Chat({ match }) {
   };
 
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: theme === 'dark' ? '#121212' : '#f5f5f5' }}>
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6">Chat</Typography>
-        <FormControl size="small">
-          <InputLabel>Theme</InputLabel>
-          <Select value={theme} label="Theme" onChange={(e) => setTheme(e.target.value)}>
-            <MenuItem value="light">Light</MenuItem>
-            <MenuItem value="dark">Dark</MenuItem>
-          </Select>
-        </FormControl>
+    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#1e1b4b' }}>
+      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: '#2d1b69', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <Typography variant="h6" color="white">Chat</Typography>
       </Box>
 
       <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
@@ -336,7 +350,7 @@ function Chat({ match }) {
           {messages.map(msg => (
             <ListItem key={msg._id}>
               <ListItemText
-                primary={msg.text}
+                primary={<Box sx={{ bgcolor: '#4c1d95', p: 2, borderRadius: 5, display: 'inline-block', maxWidth: '80%', boxShadow: 3 }}>{msg.text}</Box>}
                 secondary={msg.media && <img src={`http://localhost:5000${msg.media}`} alt="media" style={{ maxWidth: '200px', borderRadius: 8 }} />}
               />
             </ListItem>
@@ -344,7 +358,7 @@ function Chat({ match }) {
         </List>
       </Box>
 
-      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1 }}>
+      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: '#2d1b69', display: 'flex', gap: 1 }}>
         <TextField
           fullWidth
           variant="outlined"
@@ -353,21 +367,17 @@ function Chat({ match }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          sx={{ bgcolor: 'white' }}
         />
-        <IconButton color="primary" onClick={sendMessage}>
-          <SendIcon />
-        </IconButton>
-        <IconButton><EmojiEmotionsIcon /></IconButton>
-        <IconButton><CameraAltIcon /></IconButton>
-        <IconButton><MicIcon /></IconButton>
-        <IconButton color="success"><CallIcon /></IconButton>
-        <IconButton color="error"><VideoCallIcon /></IconButton>
+        <Button variant="contained" color="primary" onClick={sendMessage}>
+          Send
+        </Button>
       </Box>
     </Box>
   );
 }
 
-// Account Page (from your original code)
+// Account Page
 function Account() {
   const requestDelete = () => {
     const token = localStorage.getItem('token');
